@@ -1,5 +1,5 @@
 fuel :: Int -> Int
-fuel = (max 0) . (\x -> x - 2) . (`div` 3)
+fuel = max 0 . subtract  2 . (`div` 3)
 
 fullFuel :: Int -> Int
 fullFuel = sum . takeWhile (> 0) . tail . iterate fuel
