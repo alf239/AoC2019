@@ -3,9 +3,9 @@ import Data.List.Split
 import Debug.Trace
 
 type Memory = Array Int Int
-type Position = Int
+type Address = Int
 
-step :: (Memory, Position) -> (Memory, Position)
+step :: (Memory, Address) -> (Memory, Address)
 step (m, pc) = (m', pc + size) 
                where m' = case op of 1 -> m//[(operand 3, m ! (operand 1) + m ! (operand 2))]
                                      2 -> m//[(operand 3, m ! (operand 1) * m ! (operand 2))]
