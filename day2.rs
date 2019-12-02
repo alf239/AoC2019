@@ -12,7 +12,7 @@ fn run(m: &mut[usize]) {
         } else if m[pc] == 99 {
             break;
         } else {
-            println!("Unknown opscode {:?}", m[pc]);
+            panic!("Unknown opscode {:?}", m[pc]);
         }
     }
 }
