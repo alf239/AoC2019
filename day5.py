@@ -19,70 +19,73 @@ def addr1(mode, m, n):
     else:
         return str(m[n])             # immediate mode
 
+def trace(debug, *s):
+    if debug:
+        print(*s)
 
-def eval(memory):
+def eval(memory, debug):
     m = memory[:]
     pc = 0
 
     while m[pc] != 99:
-        print()
+        trace(debug)
         opcode = m[pc] % 100
         parmode1 = m[pc] // 100 % 10 
         parmode2 = m[pc] // 1000 % 10 
         parmode3 = m[pc] // 10000 % 10 
         if opcode == 1:
-            print(m[pc:pc+4])
-            print("add", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2), m[pc + 3])
+            trace(debug, m[pc:pc+4])
+            trace(debug, "add", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2), m[pc + 3])
             m[m[pc + 3]] = addr(parmode1, m, pc + 1) + addr(parmode2, m, pc + 2)
-            print("= %d" % m[m[pc + 3]])
+            trace(debug, "= %d" % m[m[pc + 3]])
             pc = pc + 4
         elif opcode == 2:
-            print(m[pc:pc+4])
-            print("mul", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2), m[pc + 3])
+            trace(debug, m[pc:pc+4])
+            trace(debug, "mul", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2), m[pc + 3])
             m[m[pc + 3]] = addr(parmode1, m, pc + 1) * addr(parmode2, m, pc + 2)
-            print("= %d" % m[m[pc + 3]])
+            trace(debug, "= %d" % m[m[pc + 3]])
             pc = pc + 4
         elif opcode == 3:
-            print(m[pc:pc+2])
-            print("input", m[pc + 1])
+            trace(debug, m[pc:pc+2])
+            trace(debug, "input", m[pc + 1])
             x = int(input("number: "))
             m[m[pc + 1]] = x
-            print("= %d" % m[m[pc + 1]])
+            trace(debug, "= %d" % m[m[pc + 1]])
             pc = pc + 2
         elif opcode == 4:
-            print(m[pc:pc+2])
-            print("output", addr1(parmode1, m, pc + 1))
+            trace(debug, m[pc:pc+2])
+            trace(debug, "output", addr1(parmode1, m, pc + 1))
             print("result: ", addr(parmode1, m, pc + 1))
             pc = pc + 2
         elif opcode == 5:
-            print(m[pc:pc+3])
-            print("jit", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2))
+            trace(debug, m[pc:pc+3])
+            trace(debug, "jit", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2))
             if addr(parmode1, m, pc + 1) != 0:
                 pc = addr(parmode2, m, pc + 2)
             else:
                 pc = pc + 3
         elif opcode == 6:
-            print(m[pc:pc+3])
-            print("jif", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2))
+            trace(debug, m[pc:pc+3])
+            trace(debug, "jif", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2))
             if addr(parmode1, m, pc + 1) == 0:
                 pc = addr(parmode2, m, pc + 2)
             else:
                 pc = pc + 3
         elif opcode == 7:
-            print(m[pc:pc+4])
-            print("lt", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2), m[pc + 3])
+            trace(debug, m[pc:pc+4])
+            trace(debug, "lt", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2), m[pc + 3])
             m[m[pc + 3]] = int(addr(parmode1, m, pc + 1) < addr(parmode2, m, pc + 2))
-            print("= %d" % m[m[pc + 3]])
+            trace(debug, "= %d" % m[m[pc + 3]])
             pc = pc + 4
         elif opcode == 8:
-            print(m[pc:pc+4])
-            print("eq", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2), m[pc + 3])
+            trace(debug, m[pc:pc+4])
+            trace(debug, "eq", addr1(parmode1, m, pc + 1), addr1(parmode2, m, pc + 2), m[pc + 3])
             m[m[pc + 3]] = int(addr(parmode1, m, pc + 1) == addr(parmode2, m, pc + 2))
-            print("= %d" % m[m[pc + 3]])
+            trace(debug, "= %d" % m[m[pc + 3]])
             pc = pc + 4
         else:
-            print("Unknown opscode", m[pc])
+            print("!!! Unknown opscode !!!", m[pc])
             return
     return m[0]
 
-eval(m)
+eval(m, False)
