@@ -107,5 +107,11 @@ toMemory as = listArray (0, length as - 1) as
 memory :: IntState -> Memory
 memory (_, _, m, _) = m
 
+getOutput :: IntState -> Out
+getOutput (_, o, _, _) = o
+
 runMem :: [Int] -> [Int]
 runMem = elems . memory . run . (\m -> ([], m)) . toMemory
+
+runInOut :: [Int] -> [Int] -> [Int]
+runInOut i = getOutput . run . (\m -> (i, m)) . toMemory
