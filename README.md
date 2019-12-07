@@ -12,3 +12,4 @@ This repository is merely a scratch pad for me to look up the tasks I can build 
  4. Patterns in numbers' decimary representation. Run-length encoding
  5. Add `jit`, `jif`, `in` and `out` instructions for Intcode interpreter
  6. Distances over tree - sum of all distances from a point, shortest distance in an ordered tree
+ 7. Run Intcode until blocking output, encapsulate the run
