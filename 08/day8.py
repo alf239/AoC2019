@@ -44,5 +44,7 @@ def combine1(img1, img2):
 
 task2 = functools.reduce(combine1, layers)
 
-pprint.pprint(task2)
+pretty = "\n".join(task2).replace("0", " ").replace("1", "#")
+
+print(pretty)
 
