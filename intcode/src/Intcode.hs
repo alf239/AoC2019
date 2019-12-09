@@ -1,13 +1,10 @@
 module Intcode where
 
-import qualified Data.Map.Strict as Map
-import Data.Int
-import Data.Map.Strict ((!), Map)
-import Data.List.Split
-import Debug.Trace
-import Data.List
-import Data.Maybe
 import Control.Monad.State
+import Data.Int (Int64)
+import qualified Data.Map.Strict as Map
+import Data.Map.Strict ((!), Map)
+import Debug.Trace
 
 type Value = Int64
 type Memory = Map Value Value
@@ -23,7 +20,7 @@ data IntState = IntState { input :: In
 
 
 currentOp :: IntState -> Value
-currentOp s = (memory s) ! (pc s)
+currentOp s = memory s ! pc s
 
 halted :: IntState -> Bool
 halted = (== 99) . currentOp
@@ -33,7 +30,7 @@ opcode = gets currentOp
 
 fetch :: Address -> State IntState Value
 fetch addr = do m <- gets memory
-                return $ if addr < 0 then error("Negative address")
+                return $ if addr < 0 then error "Negative address"
                                      else Map.findWithDefault 0 addr m
 
 jmp :: (Address -> Address) -> State IntState ()
@@ -47,7 +44,7 @@ addr n = do op <- opcode
             b <- gets base
             pc' <- gets pc
             let mode = op `div` 10 ^ (n + 1) `mod` 10
-            let param = pc' + (fromIntegral n)
+            let param = pc' + fromIntegral n
             case mode of 2 -> (+ b) <$> fetch param
                          1 -> return param
                          0 -> fetch param
@@ -67,7 +64,7 @@ readIo = do i <- gets input
             return $ head i
 
 writeIo :: Value -> State IntState ()
-writeIo x = modify $ \s -> s { output = x : (output s) }
+writeIo x = modify $ \s -> s { output = x : output s }
 
 binaryOp :: (Value -> Value -> Value) -> State IntState ()
 binaryOp op = do a <- addr 1 >>= fetch
@@ -129,7 +126,7 @@ runMem :: [Value] -> [Value]
 runMem = Map.elems . memory . run . fromInMemory []
 
 collectOutput :: IntState -> Out
-collectOutput s = (output s) ++ if halted s then [] else collectOutput . runO $ s { output = [] }
+collectOutput s = output s ++ if halted s then [] else collectOutput . runO $ s { output = [] }
 
 runInOut :: [Value] -> In -> Out
 runInOut m i = collectOutput . fromInMemory i $ m
