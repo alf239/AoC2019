@@ -72,15 +72,14 @@ binaryOp :: (Value -> Value -> Value) -> State IntState ()
 binaryOp op = do a <- addr 1 >>= fetch
                  b <- addr 2 >>= fetch
                  c <- addr 3
-                 let v = a `op` b
-                 _ <- store c v
+                 _ <- store c (a `op` b)
                  jmp (+ 4)
 
 jif :: (Value -> Bool) -> State IntState ()
 jif p = do a <- addr 1 >>= fetch
            b <- addr 2 >>= fetch
-           if p a then jmp (const b)
-                  else jmp (+ 3) 
+           let target = if p a then const b else (+ 3)
+           jmp target
 
 readInput :: State IntState ()
 readInput = do a <- addr 1
@@ -94,10 +93,14 @@ writeOutput = do o <- gets output
                  _ <- writeIo a
                  jmp (+ 2)
 
+noop :: State IntState ()
+noop = jmp (+ 1)
+
 stepS :: State IntState ()
 stepS = do op <- (`mod` 100) <$> opcode
            case op
-             of 1 -> binaryOp (+)
+             of 0 -> noop
+                1 -> binaryOp (+)
                 2 -> binaryOp (*)
                 3 -> readInput
                 4 -> writeOutput
@@ -105,32 +108,28 @@ stepS = do op <- (`mod` 100) <$> opcode
                 6 -> jif (== 0)
                 7 -> binaryOp (\a b -> if a < b then 1 else 0)
                 8 -> binaryOp (\a b -> if a == b then 1 else 0)
-                9 -> setBase 
-                99 -> return ()
+                9 -> setBase
 
 step :: IntState -> IntState 
 step = execState stepS
 
-run :: (In, Memory) -> IntState 
-run = head . dropWhile notEnd . iterate step . initComputer
-       where initComputer = \im -> case im of (i, m) -> IntState { input = i
-                                                                 , output = []
-                                                                 , memory = m
-                                                                 , pc = 0
-                                                                 , base = 0
-                                                                 }
-             notEnd = not . halted
+fromInMemory :: [Value] -> [Value] -> IntState 
+fromInMemory i m =
+  IntState { input = i, output = [], memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
+
+run :: IntState -> IntState 
+run = head . dropWhile (not . halted) . iterate step
 
 runO :: IntState -> IntState
 runO = head . dropWhile nonBlocking . iterate step
-       where nonBlocking s = notEnd s && (null . output $ s)
-             notEnd = not . halted
-
-toMemory :: [Value] -> Memory
-toMemory = Map.fromList . zip [0..]
+       where nonBlocking s = (not . halted $ s) && (null . output $ s)
 
 runMem :: [Value] -> [Value]
-runMem = Map.elems . memory . run . (\m -> ([], m)) . toMemory
+runMem = Map.elems . memory . run . fromInMemory []
 
-runInOut :: [Value] -> In -> [Value]
-runInOut m i = reverse . output . run . (\m' -> (i, m')) . toMemory $ m
+collectOutput :: IntState -> Out
+collectOutput s = let s' = runO s
+                   in if halted s then [] else (output s') ++ (collectOutput $ s' { output = []})
+
+runInOut :: [Value] -> In -> Out
+runInOut m i = collectOutput . fromInMemory i $ m

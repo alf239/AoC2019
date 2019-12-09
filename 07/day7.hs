@@ -6,51 +6,32 @@ import Data.List
 import Data.Maybe
 import Control.Monad.State
 
-thruster :: [Int] -> [Int] -> Int
-thruster mm [pa, pb, pc, pd, pe] = let (_, [ra], _, _) = run ([pa, 0], m) 
-                                       (_, [rb], _, _) = run ([pb, ra], m) 
-                                       (_, [rc], _, _) = run ([pc, rb], m) 
-                                       (_, [rd], _, _) = run ([pd, rc], m) 
-                                       (_, [re], _, _) = run ([pe, rd], m) in re
-                                  where m = toMemory mm
+acs :: [Value] ->  Value -> [Value] -> [Value]
+acs m ph i = runInOut m (ph : i)
 
-data ACS = Stopped
-         | Ready (Int, Int -> ACS)
+thruster :: [Value] -> [Value] -> Value
+thruster mm [pa, pb, pc, pd, pe] = let a = acs mm pa
+                                       b = acs mm pb
+                                       c = acs mm pc
+                                       d = acs mm pd
+                                       e = acs mm pe
+                                       full = e . d . c . b . a
+                                    in last $ full [0]
 
-decide :: IntState -> ACS 
-decide (is, [o], m, pc) = Ready (o, \i -> decide . runO $ (i : is, [], m, pc))
-decide (_, [], _, _)    = Stopped
+thruster2 :: [Value] -> [Value] -> Value
+thruster2 mm [pa, pb, pc, pd, pe] = let a = acs mm pa
+                                        b = acs mm pb
+                                        c = acs mm pc
+                                        d = acs mm pd
+                                        e = acs mm pe
+                                        full = e . d . c . b . a 
+                                        result = full (0 : result) 
+                                     in last result
 
-acs :: Memory -> Int -> Int -> ACS
-acs m ph i = decide . runO $ ([ph, i], [], m, 0) 
-
-asMaybe :: ACS -> Maybe (Int, Int -> ACS)
-asMaybe Stopped = Nothing
-asMaybe (Ready x) = Just x
-
-step2 :: [Int -> ACS] -> Int -> Int
-step2 [a, b, c, d, e] i = let out = do (ra, a') <- asMaybe $ a i
-                                       (rb, b') <- asMaybe $ b ra
-                                       (rc, c') <- asMaybe $ c rb
-                                       (rd, d') <- asMaybe $ d rc
-                                       (re, e') <- asMaybe $ e rd
-                                       return $ step2 [a', b', c', d', e'] re
-                           in fromMaybe i out
-
-
-thruster2 :: [Int] -> [Int] -> Int
-thruster2 mm [pa, pb, pc, pd, pe] = let Ready (ra, acsA) = acs m pa 0
-                                        Ready (rb, acsB) = acs m pb ra
-                                        Ready (rc, acsC) = acs m pc rb
-                                        Ready (rd, acsD) = acs m pd rc
-                                        Ready (re, acsE) = acs m pe rd in step2 [acsA, acsB, acsC, acsD, acsE] re
-                                    where m = toMemory mm
-
-outputs1 :: [Int] -> [Int]
+outputs1 :: [Value] -> [Value]
 outputs1 memory = [thruster memory phases | phases <- permutations [0, 1, 2, 3, 4]]
 
-
-outputs2 :: [Int] -> [Int]
+outputs2 :: [Value] -> [Value]
 outputs2 memory = [thruster2 memory phases | phases <- permutations [5, 6, 7, 8, 9]]
 
 main :: IO ()
@@ -65,10 +46,6 @@ main = do input <- map read . splitOn "," <$> getContents
           print result1
 
           putStrLn "=== Task 2 ==="
-          let Ready (q, aa) = acs (toMemory [3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5]) 9 0
-          print q
-          let Ready (qq, aaa) = aa 2
-          print qq
           print $ thruster2 [3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5] [9, 8, 7, 6, 5]
           print $ thruster2 [3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10] [9, 7, 8, 5, 6]
           putStrLn "=== Task 2 result ==="
