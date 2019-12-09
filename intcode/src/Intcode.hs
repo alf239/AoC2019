@@ -49,18 +49,15 @@ addr n = do op <- opcode
                          1 -> return param
                          0 -> fetch param
 
-withBase :: Address -> State IntState ()
-withBase b = modify $ \s -> s { base = b }
-
 setBase :: State IntState ()
-setBase = do b <- gets base
-             a <- addr 1 >>= fetch
-             withBase $ a + b
+setBase = do a <- addr 1 >>= fetch
+             _ <- modify $ \s -> s { base = a + base s }
              jmp (+ 2)
 
 readIo :: State IntState Value
 readIo = do i <- gets input
-            _ <- modify $ \s -> s { input = tail i }
+            _ <- if null i then error "Input exhausted" 
+                           else modify $ \s -> s { input = tail i }
             return $ head i
 
 writeIo :: Value -> State IntState ()
