@@ -28,22 +28,21 @@ currentOp s = (memory s) ! (pc s)
 halted :: IntState -> Bool
 halted = (== 99) . currentOp
 
-opcode :: State IntState Int64
+opcode :: State IntState Value
 opcode = gets currentOp
 
-fetch :: Int64 -> State IntState Int64
+fetch :: Value -> State IntState Value
 fetch addr = do m <- gets memory
                 return $ if addr < 0 then error("Negative address")
                                      else Map.findWithDefault 0 addr m
 
-jmp :: (Int64 -> Int64) -> State IntState ()
-jmp f = do s <- get
-           put $ s { pc = f (pc s)}
+jmp :: (Value -> Value) -> State IntState ()
+jmp f = modify $ \s -> s { pc = f (pc s)}
 
-store :: Address -> Int64 -> State IntState ()
+store :: Address -> Value -> State IntState ()
 store a v = modify $ \s -> s { memory = Map.insert a v (memory s) }
 
-addr :: Int64 -> State IntState Int64
+addr :: Value -> State IntState Value
 addr n = do op <- opcode
             b <- gets base
             pc' <- gets pc
@@ -52,7 +51,7 @@ addr n = do op <- opcode
                          1 -> return (pc' + n)
                          0 -> fetch (pc' + n)
 
-withBase :: Int64 -> State IntState ()
+withBase :: Value -> State IntState ()
 withBase b = modify $ \s -> s { base = b }
 
 setBase :: State IntState ()
@@ -61,15 +60,15 @@ setBase = do b <- gets base
              withBase $ a + b
              jmp (+ 2)
 
-readIo :: State IntState Int64
+readIo :: State IntState Value
 readIo = do i <- gets input
             _ <- modify $ \s -> s { input = tail i }
             return $ head i
 
-writeIo :: Int64 -> State IntState ()
+writeIo :: Value -> State IntState ()
 writeIo x = modify $ \s -> s { output = x : (output s) }
 
-binaryOp :: (Int64 -> Int64 -> Int64) -> State IntState ()
+binaryOp :: (Value -> Value -> Value) -> State IntState ()
 binaryOp op = do a <- addr 1 >>= fetch
                  b <- addr 2 >>= fetch
                  c <- addr 3
@@ -77,7 +76,7 @@ binaryOp op = do a <- addr 1 >>= fetch
                  _ <- store c v
                  jmp (+ 4)
 
-jif :: (Int64 -> Bool) -> State IntState ()
+jif :: (Value -> Bool) -> State IntState ()
 jif p = do a <- addr 1 >>= fetch
            b <- addr 2 >>= fetch
            if p a then jmp (const b)
@@ -127,11 +126,11 @@ runO = head . dropWhile nonBlocking . iterate step
        where nonBlocking s = notEnd s && (null . output $ s)
              notEnd = not . halted
 
-toMemory :: [Int64] -> Memory
+toMemory :: [Value] -> Memory
 toMemory = Map.fromList . zip [0..]
 
-runMem :: [Int64] -> [Int64]
+runMem :: [Value] -> [Value]
 runMem = Map.elems . memory . run . (\m -> ([], m)) . toMemory
 
-runInOut :: [Int64] -> [Int64] -> [Int64]
+runInOut :: [Value] -> In -> [Value]
 runInOut m i = reverse . output . run . (\m' -> (i, m')) . toMemory $ m
