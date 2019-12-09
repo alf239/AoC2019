@@ -1,5 +1,6 @@
 module Intcode where
 
+import Control.Monad.Loops (whileM)
 import Control.Monad.State
 import Data.Int (Int64)
 import qualified Data.Map.Strict as Map
@@ -112,18 +113,20 @@ fromInMemory :: In -> [Value] -> IntState
 fromInMemory i m =
   IntState { input = i, output = [], memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
 
-run :: IntState -> IntState 
-run = head . dropWhile (not . halted) . iterate step
+run :: State IntState ()
+run = do whileM (gets $ not . halted) stepS
+         return ()
 
-runO :: IntState -> IntState
-runO = head . dropWhile nonBlocking . iterate step
+runO :: State IntState ()
+runO = do whileM (gets nonBlocking) stepS
+          return ()
        where nonBlocking s = (not . halted $ s) && (null . output $ s)
 
 runMem :: [Value] -> [Value]
-runMem = Map.elems . memory . run . fromInMemory []
+runMem = Map.elems . memory . execState run . fromInMemory []
 
 collectOutput :: IntState -> Out
-collectOutput s = output s ++ if halted s then [] else collectOutput . runO $ s { output = [] }
+collectOutput s = output s ++ if halted s then [] else collectOutput . execState runO $ s { output = [] }
 
 runInOut :: [Value] -> In -> Out
 runInOut m i = collectOutput . fromInMemory i $ m
