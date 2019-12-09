@@ -62,6 +62,16 @@ main = hspec $ do
       runInOut compareWith8 [99]     `shouldBe` [1001]
       runInOut compareWith8 [1000]   `shouldBe` [1001]
 
+  describe "Day 7 - lazy IO" $ do
+    it "allows the output to be fed into input" $ do
+      let counter = [3,100,
+                     1001,100,-1,100,
+                     4,100,
+                     1005,100,0,
+                     99]
+      let result = runInOut counter (10 : result) 
+      result `shouldBe` [9,8,7,6,5,4,3,2,1,0]
+
   describe "Day 9 - example" $ do
     it "outputs itself" $ do
       let quine = [109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99]
