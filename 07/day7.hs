@@ -1,9 +1,6 @@
 import Intcode
-import Data.Array
-import Data.List.Split
-import Debug.Trace
-import Data.List
-import Data.Maybe
+import Data.List (permutations)
+import Data.List.Split (splitOn)
 import Control.Monad.State
 
 acs :: [Value] ->  Value -> [Value] -> [Value]
