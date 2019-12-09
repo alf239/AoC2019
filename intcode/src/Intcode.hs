@@ -31,27 +31,28 @@ halted = (== 99) . currentOp
 opcode :: State IntState Value
 opcode = gets currentOp
 
-fetch :: Value -> State IntState Value
+fetch :: Address -> State IntState Value
 fetch addr = do m <- gets memory
                 return $ if addr < 0 then error("Negative address")
                                      else Map.findWithDefault 0 addr m
 
-jmp :: (Value -> Value) -> State IntState ()
+jmp :: (Address -> Address) -> State IntState ()
 jmp f = modify $ \s -> s { pc = f (pc s)}
 
 store :: Address -> Value -> State IntState ()
 store a v = modify $ \s -> s { memory = Map.insert a v (memory s) }
 
-addr :: Value -> State IntState Value
+addr :: Int -> State IntState Value
 addr n = do op <- opcode
             b <- gets base
             pc' <- gets pc
             let mode = op `div` 10 ^ (n + 1) `mod` 10
-            case mode of 2 -> (+ b) <$> fetch (pc' + n)
-                         1 -> return (pc' + n)
-                         0 -> fetch (pc' + n)
+            let param = pc' + (fromIntegral n)
+            case mode of 2 -> (+ b) <$> fetch param
+                         1 -> return param
+                         0 -> fetch param
 
-withBase :: Value -> State IntState ()
+withBase :: Address -> State IntState ()
 withBase b = modify $ \s -> s { base = b }
 
 setBase :: State IntState ()
@@ -113,7 +114,7 @@ stepS = do op <- (`mod` 100) <$> opcode
 step :: IntState -> IntState 
 step = execState stepS
 
-fromInMemory :: [Value] -> [Value] -> IntState 
+fromInMemory :: In -> [Value] -> IntState 
 fromInMemory i m =
   IntState { input = i, output = [], memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
 
