@@ -128,8 +128,7 @@ runMem :: [Value] -> [Value]
 runMem = Map.elems . memory . run . fromInMemory []
 
 collectOutput :: IntState -> Out
-collectOutput s = let s' = runO s
-                   in if halted s then [] else (output s') ++ (collectOutput $ s' { output = []})
+collectOutput s = (output s) ++ if halted s then [] else collectOutput . runO $ s { output = [] }
 
 runInOut :: [Value] -> In -> Out
 runInOut m i = collectOutput . fromInMemory i $ m
