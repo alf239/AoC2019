@@ -61,3 +61,15 @@ main = hspec $ do
       runInOut compareWith8 [9]      `shouldBe` [1001]
       runInOut compareWith8 [99]     `shouldBe` [1001]
       runInOut compareWith8 [1000]   `shouldBe` [1001]
+
+  describe "Day 9 - example" $ do
+    it "outputs itself" $ do
+      let quince = [109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99]
+      runInOut quince [] `shouldBe` [109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99]
+
+    it "outputs 16-digit number" $ do
+       (length . show . head $ runInOut [1102,34915192,34915192,7,4,7,99,0] []) `shouldBe` 16
+
+    it "outputs a large number" $ do
+      runInOut [104,1125899906842624,99] [] `shouldBe` [1125899906842624]       
+
