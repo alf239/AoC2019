@@ -92,33 +92,30 @@ writeOutput = do o <- gets output
 noop :: IntCode ()
 noop = jmp (+ 1)
 
-stepS :: IntCode ()
-stepS = do op <- (`mod` 100) <$> opcode
-           case op
-             of 0 -> noop
-                1 -> binaryOp (+)
-                2 -> binaryOp (*)
-                3 -> readInput
-                4 -> writeOutput
-                5 -> jif (/= 0)
-                6 -> jif (== 0)
-                7 -> binaryOp (\a b -> if a < b then 1 else 0)
-                8 -> binaryOp (\a b -> if a == b then 1 else 0)
-                9 -> setBase
-
-step :: IntState -> IntState 
-step = execState stepS
+step :: IntCode ()
+step = do op <- (`mod` 100) <$> opcode
+          case op
+            of 0 -> noop
+               1 -> binaryOp (+)
+               2 -> binaryOp (*)
+               3 -> readInput
+               4 -> writeOutput
+               5 -> jif (/= 0)
+               6 -> jif (== 0)
+               7 -> binaryOp (\a b -> if a < b then 1 else 0)
+               8 -> binaryOp (\a b -> if a == b then 1 else 0)
+               9 -> setBase
 
 fromInMemory :: In -> [Value] -> IntState 
 fromInMemory i m =
   IntState { input = i, output = [], memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
 
 run :: IntCode ()
-run = do whileM (gets $ not . halted) stepS
+run = do whileM (gets $ not . halted) step
          return ()
 
 runO :: IntCode ()
-runO = do whileM (gets nonBlocking) stepS
+runO = do whileM (gets nonBlocking) step
           return ()
        where nonBlocking s = (not . halted $ s) && (null . output $ s)
 
