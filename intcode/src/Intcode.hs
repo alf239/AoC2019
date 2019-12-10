@@ -18,7 +18,7 @@ data IntState = IntState { input :: In
                          , pc :: Address
                          , base :: Address
                          } deriving (Show)   
-
+type IntCode = State IntState
 
 currentOp :: IntState -> Value
 currentOp s = memory s ! pc s
@@ -26,21 +26,21 @@ currentOp s = memory s ! pc s
 halted :: IntState -> Bool
 halted = (== 99) . currentOp
 
-opcode :: State IntState Value
+opcode :: IntCode Value
 opcode = gets currentOp
 
-fetch :: Address -> State IntState Value
+fetch :: Address -> IntCode Value
 fetch addr = do m <- gets memory
                 return $ if addr < 0 then error "Negative address"
                                      else Map.findWithDefault 0 addr m
 
-jmp :: (Address -> Address) -> State IntState ()
+jmp :: (Address -> Address) -> IntCode ()
 jmp f = modify $ \s -> s { pc = f (pc s)}
 
-store :: Address -> Value -> State IntState ()
+store :: Address -> Value -> IntCode ()
 store a v = modify $ \s -> s { memory = Map.insert a v (memory s) }
 
-addr :: Int -> State IntState Value
+addr :: Int -> IntCode Value
 addr n = do op <- opcode
             b <- gets base
             pc' <- gets pc
@@ -50,49 +50,49 @@ addr n = do op <- opcode
                          1 -> return param
                          0 -> fetch param
 
-setBase :: State IntState ()
+setBase :: IntCode ()
 setBase = do a <- addr 1 >>= fetch
              _ <- modify $ \s -> s { base = a + base s }
              jmp (+ 2)
 
-readIo :: State IntState Value
+readIo :: IntCode Value
 readIo = do i <- gets input
             _ <- if null i then error "Input exhausted" 
                            else modify $ \s -> s { input = tail i }
             return $ head i
 
-writeIo :: Value -> State IntState ()
+writeIo :: Value -> IntCode ()
 writeIo x = modify $ \s -> s { output = x : output s }
 
-binaryOp :: (Value -> Value -> Value) -> State IntState ()
+binaryOp :: (Value -> Value -> Value) -> IntCode ()
 binaryOp op = do a <- addr 1 >>= fetch
                  b <- addr 2 >>= fetch
                  c <- addr 3
                  _ <- store c (a `op` b)
                  jmp (+ 4)
 
-jif :: (Value -> Bool) -> State IntState ()
+jif :: (Value -> Bool) -> IntCode ()
 jif p = do a <- addr 1 >>= fetch
            b <- addr 2 >>= fetch
            let target = if p a then const b else (+ 3)
            jmp target
 
-readInput :: State IntState ()
+readInput :: IntCode ()
 readInput = do a <- addr 1
                v <- readIo
                _ <- store a v
                jmp (+ 2)
 
-writeOutput :: State IntState ()
+writeOutput :: IntCode ()
 writeOutput = do o <- gets output
                  a <- addr 1 >>= fetch
                  _ <- writeIo a
                  jmp (+ 2)
 
-noop :: State IntState ()
+noop :: IntCode ()
 noop = jmp (+ 1)
 
-stepS :: State IntState ()
+stepS :: IntCode ()
 stepS = do op <- (`mod` 100) <$> opcode
            case op
              of 0 -> noop
@@ -113,11 +113,11 @@ fromInMemory :: In -> [Value] -> IntState
 fromInMemory i m =
   IntState { input = i, output = [], memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
 
-run :: State IntState ()
+run :: IntCode ()
 run = do whileM (gets $ not . halted) stepS
          return ()
 
-runO :: State IntState ()
+runO :: IntCode ()
 runO = do whileM (gets nonBlocking) stepS
           return ()
        where nonBlocking s = (not . halted $ s) && (null . output $ s)
