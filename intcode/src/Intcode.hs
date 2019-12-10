@@ -61,9 +61,6 @@ readIo = do i <- gets input
                            else modify $ \s -> s { input = tail i }
             return $ head i
 
-writeIo :: Value -> IntCode ()
-writeIo x = modify $ \s -> s { output = x : output s }
-
 binaryOp :: (Value -> Value -> Value) -> IntCode ()
 binaryOp op = do a <- addr 1 >>= fetch
                  b <- addr 2 >>= fetch
@@ -84,9 +81,8 @@ readInput = do a <- addr 1
                jmp (+ 2)
 
 writeOutput :: IntCode ()
-writeOutput = do o <- gets output
-                 a <- addr 1 >>= fetch
-                 _ <- writeIo a
+writeOutput = do a <- addr 1 >>= fetch
+                 _ <- modify $ \s -> s { output = a : output s }
                  jmp (+ 2)
 
 noop :: IntCode ()
