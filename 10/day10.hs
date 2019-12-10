@@ -29,9 +29,27 @@ detects sky a b | a == b    = False
                 | otherwise = all (\p -> task (Vector a p) b /= ON_SEGMENT) (filter (/= b) . filter (/= a) $ sky) 
 
 
+direction :: RealFloat a => Point -> Point -> a
+direction (Point x0 y0) (Point x y) = let d = atan2 (fromIntegral $ x - x0) (fromIntegral $ y0 - y)
+                                       in if d < 0 then d + 2 * pi else d
+
+nrInQueue :: [Point] -> Point -> Point -> Int
+nrInQueue sky a b = length . filter (\p -> task (Vector a b) p == ON_SEGMENT) . filter (/= b) . filter (/= a) $ sky
+
+vapourOrder :: RealFloat a => [Point] -> Point -> Point -> (Int, a)
+vapourOrder sky c p | p == c    = (2147483647, 0)
+                    | otherwise = (nrInQueue sky c p, direction c p)
 
 main :: IO ()
 main = do input <- lines <$> getContents
           let sky = [Point x y | (y, l) <- zip [0..] input, (x, a) <- zip [0..] l, a == '#'] 
           let visibility = [(length $ filter (detects sky p) sky, p) | p <- sky]
-          print $ take 10 . reverse . sort $ visibility
+          putStrLn "=== Task 1 ==="
+          let (count, station) = head . reverse . sort $ visibility
+          print $ (station, count)
+
+          putStrLn "=== Task 2 ==="
+          print $ head . drop 199 . zip [1..] . sortOn (\a -> (vapourOrder sky station a, a)) $ sky
+
+
+
