@@ -23,3 +23,4 @@ This repository is merely a scratch pad for me to look up the tasks I can build 
   8. A general task, speed coding `chunkOf n` and `reduce`/`foldl`
   9. Full Intcode computer with relative address mode
  10. Computational geometry, visibility on a grid, coordinates to angles
+ 11. Interacting states; I need more practice with monad transformers
