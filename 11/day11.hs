@@ -51,7 +51,7 @@ robot1' = do whileM (gets $ not . halted . program) roboStep
              gets hull
 
 robot1 :: Painter -> Int
-robot1 = Map.size . traceShowId . evalState robot1'
+robot1 = Map.size . evalState robot1'
 
 main :: IO ()
 main = do input <- map read . splitOn "," <$> getContents
@@ -61,7 +61,10 @@ main = do input <- map read . splitOn "," <$> getContents
           putStrLn "=== Task 1 ==="
           print $ robot1 painter 
 
-          -- putStrLn "=== Task 2 ==="
-          -- let out = runInOut input [2]
-          -- print out
+          let painter2 = Painter (Map.fromList [((0, 0), 1)]) North (0, 0) program
+          putStrLn "=== Task 2 ==="
+          let result = evalState robot1' painter2
+          let picture = reverse [reverse [if Map.findWithDefault 0 (x, y) result == 1 then '#' else ' ' | x <- [-42..0]] | y <- [-20..0]]
+          putStrLn . unlines $ picture
+
 

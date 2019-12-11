@@ -1,7 +1,7 @@
 module Intcode where
 
 import Control.Monad.Loops (whileM)
-import Control.Monad.State
+import Control.Monad.State.Strict
 import Data.Int (Int64)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict ((!), Map)
