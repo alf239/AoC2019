@@ -24,3 +24,5 @@ This repository is merely a scratch pad for me to look up the tasks I can build 
   9. Full Intcode computer with relative address mode
  10. Computational geometry, visibility on a grid, coordinates to angles
  11. Interacting states; I need more practice with monad transformers
+ 12. 4-body problem in 3D. Part 1 is straightforward coding, part 2 is a single-insight puzzle
+ 
