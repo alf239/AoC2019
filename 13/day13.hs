@@ -14,3 +14,6 @@ main = do input <- map read . splitOn "," <$> getContents
          
           print $ length . filter ((== 2) . snd) . M.toList $ board
 
+          putStrLn "=== Task 2 ==="
+          let out = runInOut (2 : tail input) [1,1..]
+          print $ last . filter ((== (-1, 0)) . fst) . M.toList $ board
