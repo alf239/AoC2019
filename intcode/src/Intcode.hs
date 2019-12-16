@@ -115,6 +115,14 @@ runO = do whileM (gets nonBlocking) step
           return ()
        where nonBlocking s = (not . halted $ s) && (null . output $ s)
 
+runI :: IntCode [Value]
+runI = do whileM (gets nonBlocking) step
+          out <- gets output 
+          modify $ \s -> s { output = [] }
+          return $ reverse out
+       where nonBlocking s    = (not . halted $ s) && (not . exhaustedInput $ s)
+             exhaustedInput s = (null . input $ s) && ((== 3) . (`mod` 100) . currentOp $ s)
+
 runMem :: [Value] -> [Value]
 runMem = Map.elems . memory . execState run . fromInMemory []
 

@@ -30,40 +30,47 @@ move West  (x, y) = (x + 1, y)
 move South (x, y) = (x, y - 1)
 move East  (x, y) = (x - 1, y)
 
+sense :: Painter -> Value
+sense p = Map.findWithDefault 0 (pos p) (hull p)
+
+executeUntilBlocked :: [Value] -> State Painter [Value]
+executeUntilBlocked i = do ic <- gets program
+                           let (out, ic') = runState runI $ ic { input = i }
+                           modify $ \s -> s { program = ic' }
+                           return out
+
+turn :: (Dir -> Dir) -> State Painter ()
+turn t = modify $ \s -> s { dir = t . dir $ s }
+
+paint :: Value -> State Painter ()
+paint c = modify $ \s -> s { hull = Map.insert (pos s) c (hull s) }
+
+stepForward :: State Painter ()
+stepForward = modify $ \s -> s { pos = move (dir s) (pos s) }
+
 roboStep :: State Painter ()
-roboStep = do m <- gets hull
-              d <- gets dir
-              p <- gets pos
-              ic <- gets program
-              let ic' = execState runO $ ic { input = [ Map.findWithDefault 0 p m ] }
-              modify $ \s -> s { program = ic' { output = [] } }
-              if halted ic'
-                then traceShow "halted 1" $ return ()
-                else 
-                  let [c]  = output ic'
-                      ic'' = execState runO $ ic' { output = [] }
-                      [dd] = output ic'' 
-                      d'   = if dd == 0 then prev d else next d
-                   in put $ Painter { hull = Map.insert p c m, dir = d', pos = move d' p, program = ic'' { output = [] } }
+roboStep = do s <- gets sense
+              out <- executeUntilBlocked [s]
+              let [c, dd] = out
+              _ <- paint c
+              _ <- turn $ if dd == 0 then prev else next
+              stepForward 
 
-robot1' :: State Painter (Map Position Value)
-robot1' = do whileM (gets $ not . halted . program) roboStep
-             gets hull
-
-robot1 :: Painter -> Int
-robot1 = Map.size . evalState robot1'
+paintHull :: State Painter (Map Position Value)
+paintHull = do whileM (gets $ not . halted . program) roboStep
+               gets hull
 
 main :: IO ()
 main = do input <- map read . splitOn "," <$> getContents
           let program = fromInMemory [] input
-          let painter = Painter Map.empty North (0, 0) program
 
           putStrLn "=== Task 1 ==="
-          print $ robot1 painter 
+          let painter = Painter Map.empty North (0, 0) program
+          print . Map.size $ evalState paintHull painter 
 
-          let painter2 = Painter (Map.fromList [((0, 0), 1)]) North (0, 0) program
           putStrLn "=== Task 2 ==="
-          let result = evalState robot1' painter2
+          let painter2 = Painter (Map.fromList [((0, 0), 1)]) North (0, 0) program
+          let result = evalState paintHull painter2
           let picture = reverse [reverse [if Map.findWithDefault 0 (x, y) result == 1 then '#' else ' ' | x <- [-42..0]] | y <- [-20..0]]
           putStrLn . unlines $ picture
 
