@@ -17,7 +17,7 @@ category:            Game
 extra-source-files:  CHANGELOG.md
 
 executable day17
-  main-is:             hay17.hs
+  main-is:             day17.hs
   -- other-modules:
   -- other-extensions:
   build-depends:       base ^>=4.12.0.0,
