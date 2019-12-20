@@ -158,6 +158,21 @@ for goal, deps in curated.items():
 # nx.draw_circular(G, with_labels=True)
 # plt.show()
 
-print(min_price(nx.all_topological_sorts(G)))
+# Task 1
+# print(min_price(nx.all_topological_sorts(G)))
 
-print(price('@', 'xvbturnloamgpcjzs', 0, 9999))
+def partial(s):
+    res = price('@', s, 0, 9999) - 2
+    print(s, res)
+    return res
+
+
+partial('txvcs')
+partial('tvxcs')
+partial('mg')
+partial('noa')
+partial('lpz')
+
+
+print(partial('tuxvcs') + partial('mg') + partial('noa') + partial('lpz'))
+
