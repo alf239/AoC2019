@@ -9,11 +9,13 @@ import qualified Data.Set as Set
 import Intcode
 import Data.Char
 import Data.Either
+import Debug.Trace
 
 runProgram :: [Value] -> [String] -> Either String Value
-runProgram mm ss = case o of [result] -> Right result
-                             xs       -> Left (map (chr . fromIntegral) xs)
-                 where o = runInOut mm p
+runProgram mm ss = if last o > 255 then Right (last o)
+                                   else Left (asString o)
+                 where asString = map (chr . fromIntegral)
+                       o = runInOut mm p
                        p = map fromIntegral . map ord . intercalate "\n" $ ss
 
 main :: IO ()
@@ -31,3 +33,20 @@ main = do input <- map read . splitOn "," <$> getContents
                                         ]
           case result of Right damage -> print damage
                          Left video -> putStrLn video
+
+          putStrLn "=== Task 2 ==="
+          let result2 = runProgram input [ "NOT A J"
+                                         , "NOT J J"
+                                         , "AND B J"
+                                         , "AND C J"
+                                         , "NOT J J" -- !(A && B && C)
+                                         , "NOT H T"
+                                         , "NOT T T"
+                                         , "OR E T" -- (H || E)
+                                         , "AND T J"
+                                         , "AND D J"
+                                         , "RUN"
+                                         , ""
+                                         ]
+          case result2 of Right damage -> print damage
+                          Left video -> putStrLn video
