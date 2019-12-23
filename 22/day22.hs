@@ -85,8 +85,7 @@ unshuffle n (a, b) k = modmul n a' (modadd n k (negate b))
                        where Just a' = modInv a n
 
 main :: IO ()
-main = do rules <- lines <$> getContents
-          let commands = map command rules
+main = do commands <- map command . lines <$> getContents
 
           putStrLn "=== Tests ==="
           print ("deal into new stack",       [shuffle 10 new_stack              x | x <- [0..9]])
