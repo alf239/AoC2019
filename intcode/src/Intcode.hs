@@ -2,6 +2,7 @@ module Intcode where
 
 import Control.Monad.Loops (whileM)
 import Control.Monad.State.Strict
+import Control.Monad.Writer.Lazy
 import Data.Functor.Identity (Identity)
 import Data.Int (Int64)
 import qualified Data.Map.Strict as Map
@@ -13,14 +14,14 @@ type Memory = Map Value Value
 type Address = Value
 type In = [Value]
 type Out = [Value]
-data IntState = IntState { input :: In
-                         , output :: Out
-                         , memory :: Memory
+data IntState = IntState { memory :: Memory
                          , pc :: Address
                          , base :: Address
-                         } deriving (Show)   
+                         } deriving (Show)
+
 type IntCodeT = StateT IntState
-type IntCode = IntCodeT Identity
+type BasicIC = StateT In (Writer Out)
+type IntCode = IntCodeT BasicIC
 
 currentOp :: IntState -> Value
 currentOp s = memory s ! pc s
@@ -57,12 +58,6 @@ setBase = do a <- addr 1 >>= fetch
              _ <- modify $ \s -> s { base = a + base s }
              jmp (+ 2)
 
-readIoS :: Monad m => IntCodeT m Value
-readIoS = do i <- gets input
-             _ <- if null i then error "Input exhausted" 
-                            else modify $ \s -> s { input = tail i }
-             return $ head i
-
 binaryOp :: Monad m => (Value -> Value -> Value) -> IntCodeT m ()
 binaryOp op = do a <- addr 1 >>= fetch
                  b <- addr 2 >>= fetch
@@ -76,24 +71,21 @@ jif p = do a <- addr 1 >>= fetch
            let target = if p a then const b else (+ 3)
            jmp target
 
-readInput :: Monad m => IntCodeT m Value -> IntCodeT m ()
+readInput :: Monad m => m Value -> IntCodeT m ()
 readInput rd = do a <- addr 1
-                  v <- rd
+                  v <- lift rd
                   _ <- store a v
                   jmp (+ 2)
 
-writeIoS :: Monad m => Value -> IntCodeT m ()
-writeIoS a = modify $ \s -> s { output = a : output s }
-
-writeOutput :: Monad m => (Value -> IntCodeT m ()) -> IntCodeT m ()
+writeOutput :: Monad m => (Value -> m ()) -> IntCodeT m ()
 writeOutput write = do a <- addr 1 >>= fetch
-                       _ <- write a
+                       _ <- lift $ write a
                        jmp (+ 2)
 
 noop :: Monad m => IntCodeT m ()
 noop = jmp (+ 1)
 
-stepRW :: Monad m => IntCodeT m Value -> (Value -> IntCodeT m ()) -> IntCodeT m ()
+stepRW :: Monad m => m Value -> (Value -> m ()) -> IntCodeT m ()
 stepRW rd wr = do op <- (`mod` 100) <$> opcode
                   case op
                     of 0 -> noop
@@ -107,35 +99,38 @@ stepRW rd wr = do op <- (`mod` 100) <$> opcode
                        8 -> binaryOp (\a b -> if a == b then 1 else 0)
                        9 -> setBase
 
+runRW :: Monad m => m Value -> (Value -> m ()) -> IntCodeT m ()
+runRW rd wr = do whileM (gets $ not . halted) $ stepRW rd wr
+                 return ()
+
+readIoS :: BasicIC Value
+readIoS = do i <- gets head
+             _ <- modify tail
+             return i
+
+writeIoS :: Value -> BasicIC ()
+writeIoS a = lift $ tell [a]
+
 step :: IntCode ()
 step = stepRW readIoS writeIoS
 
-fromInMemory :: In -> [Value] -> IntState 
-fromInMemory i m =
-  IntState { input = i, output = [], memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
+fromMemory :: [Value] -> IntState 
+fromMemory m = IntState { memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
 
-run :: IntCode ()
-run = do whileM (gets $ not . halted) step
-         return ()
+runIntCodeT :: Monad m => IntCodeT m a -> IntState -> m (a, IntState)
+runIntCodeT = runStateT
 
-runO :: IntCode ()
-runO = do whileM (gets nonBlocking) step
-          return ()
-       where nonBlocking s = (not . halted $ s) && (null . output $ s)
-
-runI :: IntCode [Value]
-runI = do whileM (gets nonBlocking) step
-          out <- gets output 
-          modify $ \s -> s { output = [] }
-          return $ reverse out
-       where nonBlocking s    = (not . halted $ s) && (not . exhaustedInput $ s)
-             exhaustedInput s = (null . input $ s) && ((== 3) . (`mod` 100) . currentOp $ s)
+execIntCodeT :: Monad m => IntCodeT m a -> IntState -> m IntState
+execIntCodeT = execStateT
 
 runMem :: [Value] -> [Value]
-runMem = Map.elems . memory . execState run . fromInMemory []
-
-collectOutput :: IntState -> Out
-collectOutput s = output s ++ if halted s then [] else collectOutput . execState runO $ s { output = [] }
+runMem m = let init           = fromMemory m
+               intCode        = execIntCodeT (runRW readIoS writeIoS) init
+               processedInput = evalStateT intCode []
+           in Map.elems . memory . fst . runWriter $ processedInput
 
 runInOut :: [Value] -> In -> Out
-runInOut m i = collectOutput . fromInMemory i $ m
+runInOut m i = let init           = fromMemory m
+                   intCode        = runIntCodeT (runRW readIoS writeIoS) init
+                   processedInput = runStateT intCode i
+               in execWriter processedInput
