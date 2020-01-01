@@ -2,6 +2,7 @@ module Intcode where
 
 import Control.Monad.Loops (whileM)
 import Control.Monad.State.Strict
+import Data.Functor.Identity (Identity)
 import Data.Int (Int64)
 import qualified Data.Map.Strict as Map
 import Data.Map.Strict ((!), Map)
@@ -18,7 +19,8 @@ data IntState = IntState { input :: In
                          , pc :: Address
                          , base :: Address
                          } deriving (Show)   
-type IntCode = State IntState
+type IntCodeT = StateT IntState
+type IntCode = IntCodeT Identity
 
 currentOp :: IntState -> Value
 currentOp s = memory s ! pc s
@@ -26,21 +28,21 @@ currentOp s = memory s ! pc s
 halted :: IntState -> Bool
 halted = (== 99) . currentOp
 
-opcode :: IntCode Value
+opcode :: Monad m => IntCodeT m Value
 opcode = gets currentOp
 
-fetch :: Address -> IntCode Value
+fetch :: Monad m => Address -> IntCodeT m Value
 fetch addr = do m <- gets memory
                 return $ if addr < 0 then error "Negative address"
                                      else Map.findWithDefault 0 addr m
 
-jmp :: (Address -> Address) -> IntCode ()
+jmp :: Monad m => (Address -> Address) -> IntCodeT m ()
 jmp f = modify $ \s -> s { pc = f (pc s)}
 
-store :: Address -> Value -> IntCode ()
+store :: Monad m => Address -> Value -> IntCodeT m ()
 store a v = modify $ \s -> s { memory = Map.insert a v (memory s) }
 
-addr :: Int -> IntCode Value
+addr :: Monad m => Int -> IntCodeT m Value
 addr n = do op <- opcode
             b <- gets base
             pc' <- gets pc
@@ -50,57 +52,63 @@ addr n = do op <- opcode
                          1 -> return param
                          0 -> fetch param
 
-setBase :: IntCode ()
+setBase :: Monad m => IntCodeT m ()
 setBase = do a <- addr 1 >>= fetch
              _ <- modify $ \s -> s { base = a + base s }
              jmp (+ 2)
 
-readIo :: IntCode Value
-readIo = do i <- gets input
-            _ <- if null i then error "Input exhausted" 
-                           else modify $ \s -> s { input = tail i }
-            return $ head i
+readIoS :: Monad m => IntCodeT m Value
+readIoS = do i <- gets input
+             _ <- if null i then error "Input exhausted" 
+                            else modify $ \s -> s { input = tail i }
+             return $ head i
 
-binaryOp :: (Value -> Value -> Value) -> IntCode ()
+binaryOp :: Monad m => (Value -> Value -> Value) -> IntCodeT m ()
 binaryOp op = do a <- addr 1 >>= fetch
                  b <- addr 2 >>= fetch
                  c <- addr 3
                  _ <- store c (a `op` b)
                  jmp (+ 4)
 
-jif :: (Value -> Bool) -> IntCode ()
+jif :: Monad m => (Value -> Bool) -> IntCodeT m ()
 jif p = do a <- addr 1 >>= fetch
            b <- addr 2 >>= fetch
            let target = if p a then const b else (+ 3)
            jmp target
 
-readInput :: IntCode ()
-readInput = do a <- addr 1
-               v <- readIo
-               _ <- store a v
-               jmp (+ 2)
+readInput :: Monad m => IntCodeT m Value -> IntCodeT m ()
+readInput rd = do a <- addr 1
+                  v <- rd
+                  _ <- store a v
+                  jmp (+ 2)
 
-writeOutput :: IntCode ()
-writeOutput = do a <- addr 1 >>= fetch
-                 _ <- modify $ \s -> s { output = a : output s }
-                 jmp (+ 2)
+writeIoS :: Monad m => Value -> IntCodeT m ()
+writeIoS a = modify $ \s -> s { output = a : output s }
 
-noop :: IntCode ()
+writeOutput :: Monad m => (Value -> IntCodeT m ()) -> IntCodeT m ()
+writeOutput write = do a <- addr 1 >>= fetch
+                       _ <- write a
+                       jmp (+ 2)
+
+noop :: Monad m => IntCodeT m ()
 noop = jmp (+ 1)
 
+stepRW :: Monad m => IntCodeT m Value -> (Value -> IntCodeT m ()) -> IntCodeT m ()
+stepRW rd wr = do op <- (`mod` 100) <$> opcode
+                  case op
+                    of 0 -> noop
+                       1 -> binaryOp (+)
+                       2 -> binaryOp (*)
+                       3 -> readInput rd
+                       4 -> writeOutput wr
+                       5 -> jif (/= 0)
+                       6 -> jif (== 0)
+                       7 -> binaryOp (\a b -> if a < b then 1 else 0)
+                       8 -> binaryOp (\a b -> if a == b then 1 else 0)
+                       9 -> setBase
+
 step :: IntCode ()
-step = do op <- (`mod` 100) <$> opcode
-          case op
-            of 0 -> noop
-               1 -> binaryOp (+)
-               2 -> binaryOp (*)
-               3 -> readInput
-               4 -> writeOutput
-               5 -> jif (/= 0)
-               6 -> jif (== 0)
-               7 -> binaryOp (\a b -> if a < b then 1 else 0)
-               8 -> binaryOp (\a b -> if a == b then 1 else 0)
-               9 -> setBase
+step = stepRW readIoS writeIoS
 
 fromInMemory :: In -> [Value] -> IntState 
 fromInMemory i m =
