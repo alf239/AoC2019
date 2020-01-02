@@ -85,23 +85,23 @@ writeOutput write = do a <- addr 1 >>= fetch
 noop :: Monad m => IntCodeT m ()
 noop = jmp (+ 1)
 
-stepRW :: Monad m => m Value -> (Value -> m ()) -> IntCodeT m ()
-stepRW rd wr = do op <- (`mod` 100) <$> opcode
-                  case op
-                    of 0 -> noop
-                       1 -> binaryOp (+)
-                       2 -> binaryOp (*)
-                       3 -> readInput rd
-                       4 -> writeOutput wr
-                       5 -> jif (/= 0)
-                       6 -> jif (== 0)
-                       7 -> binaryOp (\a b -> if a < b then 1 else 0)
-                       8 -> binaryOp (\a b -> if a == b then 1 else 0)
-                       9 -> setBase
+step :: Monad m => m Value -> (Value -> m ()) -> IntCodeT m ()
+step rd wr = do op <- (`mod` 100) <$> opcode
+                case op
+                  of 0 -> noop
+                     1 -> binaryOp (+)
+                     2 -> binaryOp (*)
+                     3 -> readInput rd
+                     4 -> writeOutput wr
+                     5 -> jif (/= 0)
+                     6 -> jif (== 0)
+                     7 -> binaryOp (\a b -> if a < b then 1 else 0)
+                     8 -> binaryOp (\a b -> if a == b then 1 else 0)
+                     9 -> setBase
 
-runRW :: Monad m => m Value -> (Value -> m ()) -> IntCodeT m ()
-runRW rd wr = do whileM (gets $ not . halted) $ stepRW rd wr
-                 return ()
+runProgram :: Monad m => m Value -> (Value -> m ()) -> IntCodeT m ()
+runProgram rd wr = do whileM (gets $ not . halted) $ step rd wr
+                      return ()
 
 readIoS :: BasicIC Value
 readIoS = do i <- gets head
@@ -111,20 +111,17 @@ readIoS = do i <- gets head
 writeIoS :: Value -> BasicIC ()
 writeIoS a = lift $ tell [a]
 
-step :: IntCode ()
-step = stepRW readIoS writeIoS
-
 fromMemory :: [Value] -> IntState 
 fromMemory m = IntState { memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
 
 runMem :: [Value] -> [Value]
 runMem m = let init           = fromMemory m
-               intCode        = execStateT (runRW readIoS writeIoS) init
+               intCode        = execStateT (runProgram readIoS writeIoS) init
                processedInput = evalStateT intCode []
            in Map.elems . memory . fst . runWriter $ processedInput
 
 runInOut :: [Value] -> In -> Out
 runInOut m i = let init           = fromMemory m
-                   intCode        = runStateT (runRW readIoS writeIoS) init
+                   intCode        = runStateT (runProgram readIoS writeIoS) init
                    processedInput = runStateT intCode i
                in execWriter processedInput
