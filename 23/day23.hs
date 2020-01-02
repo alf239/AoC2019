@@ -52,24 +52,27 @@ runCh ic id i o = let rd = readCh id o
                         result <- evalStateT state (False, Nothing, str, [])
                         return $ fst result
 
+onSilence :: Int -> InChan InMessage -> StateT (InMessage, Set Value) IO ()
+onSilence n zero = do (xy, stale) <- get
+                      when (Set.size stale == n) $ do
+                        put (xy, Set.empty)
+                        liftIO . writeChan zero $ xy
+                        liftIO . print $ ("Stalling", xy)
+                      liftIO yield
+
+onMessage :: [InChan InMessage] -> OutMessage -> StateT (InMessage, Set Value) IO ()
+onMessage cs (Right (255, x, y)) = do modify $ \(_, stale) -> ((x, y), stale)
+                                      liftIO . print $ ("NAT update", (x, y))
+onMessage cs (Right (id, x, y))  = do modify $ \(xy, stale) -> (xy, Set.delete id stale)
+                                      liftIO . writeChan (cs !! fromIntegral id) $ (x, y)
+onMessage cs (Left id)           = modify $ \(xy, stale) -> (xy, Set.insert id stale)
+
 
 consume :: Stream OutMessage -> [InChan InMessage] -> StateT (InMessage, Set Value) IO ()
 consume str cs  = do msg <- liftIO . tryReadNext $ str
-                     case msg of 
-                       Pending -> do (xy, stale) <- get
-                                     when (Set.size stale == length cs) $ do put (xy, Set.empty)
-                                                                             liftIO . writeChan (head cs) $ xy
-                                                                             liftIO . print $ ("Stalling", xy)
-                                     liftIO yield
-                                     consume str cs
-                       Next (Right (255, x, y)) str' -> do modify $ \(_, stale) -> ((x, y), stale)
-                                                           liftIO . print $ ("NAT update", (x, y))
-                                                           consume str' cs
-                       Next (Right (id, x, y)) str' -> do modify $ \(xy, stale) -> (xy, Set.delete id stale)
-                                                          liftIO . writeChan (cs !! fromIntegral id) $ (x, y)
-                                                          consume str' cs
-                       Next (Left id) str'  -> do modify $ \(xy, stale) -> (xy, Set.insert id stale)
-                                                  consume str' cs
+                     str' <- case msg of Pending      -> onSilence (length cs) (head cs) >> return str
+                                         Next m str'' -> onMessage cs m                  >> return str''
+                     consume str' cs 
 
 coordinate :: OutChan OutMessage -> [InChan InMessage] -> StateT (InMessage, Set Value) IO ()
 coordinate ch cs = do [str] <- liftIO . streamChan 1 $ ch
