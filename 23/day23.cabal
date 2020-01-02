@@ -25,6 +25,8 @@ executable day23
                        mtl >= 2.2.2,
                        monad-loops >= 0.4,
                        extra >= 1.6.18,
-                       intcode
+                       intcode,
+                       unagi-chan >= 0.4.1.3,
+                       async >= 2.2.2
   -- hs-source-dirs:
   default-language:    Haskell2010
