@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.Loops
 import Control.Monad.State.Strict
 import Debug.Trace
+import System.IO
 
 type InMessage = (Value, Value)
 type OutMessage = Either Value (Value, Value, Value)
@@ -86,5 +87,7 @@ main = do baseNic <- fromMemory . map read . splitOn "," <$> getContents
                 do (i, o) <- newChan
                    _ <- forkIO $ runCh baseNic id o ci
                    return i
+
+          hSetBuffering stdout LineBuffering
 
           evalStateT (coordinate co cs) ((-1, -1), Set.empty)
