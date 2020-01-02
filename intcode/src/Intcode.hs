@@ -117,20 +117,14 @@ step = stepRW readIoS writeIoS
 fromMemory :: [Value] -> IntState 
 fromMemory m = IntState { memory = Map.fromAscList . zip [0..] $ m, pc = 0, base = 0 }
 
-runIntCodeT :: Monad m => IntCodeT m a -> IntState -> m (a, IntState)
-runIntCodeT = runStateT
-
-execIntCodeT :: Monad m => IntCodeT m a -> IntState -> m IntState
-execIntCodeT = execStateT
-
 runMem :: [Value] -> [Value]
 runMem m = let init           = fromMemory m
-               intCode        = execIntCodeT (runRW readIoS writeIoS) init
+               intCode        = execStateT (runRW readIoS writeIoS) init
                processedInput = evalStateT intCode []
            in Map.elems . memory . fst . runWriter $ processedInput
 
 runInOut :: [Value] -> In -> Out
 runInOut m i = let init           = fromMemory m
-                   intCode        = runIntCodeT (runRW readIoS writeIoS) init
+                   intCode        = runStateT (runRW readIoS writeIoS) init
                    processedInput = runStateT intCode i
                in execWriter processedInput

@@ -47,7 +47,7 @@ writeCh ch a = do (_, _, _, buffer) <- get
 runCh :: IntState -> Int -> OutChan InMessage -> InChan OutMessage -> IO ()
 runCh ic id i o = let rd = readCh id o
                       wr = writeCh o
-                      state = runIntCodeT (runRW rd wr) ic
+                      state = runStateT (runRW rd wr) ic
                   in do [str] <- streamChan 1 i
                         result <- evalStateT state (False, Nothing, str, [])
                         return $ fst result
