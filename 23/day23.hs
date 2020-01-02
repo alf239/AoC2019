@@ -31,6 +31,7 @@ readCh id o = do (ready, ib, str, ob) <- get
                                                        Next (a, b) str' -> do put (True, Just b, str', ob)
                                                                               return a
                                                        Pending          -> do liftIO . writeChan o $ Left (fromIntegral id)
+                                                                              liftIO yield
                                                                               return $ negate 1
                           else do put (True, ib, str, ob)
                                   return (fromIntegral id)
@@ -39,18 +40,14 @@ writeCh :: InChan OutMessage -> Value -> ChannelIo ()
 writeCh ch a = do (_, _, _, buffer) <- get
                   case buffer of
                     [b, c]    -> do liftIO . writeChan ch $ Right (c, b, a)
+                                    liftIO yield
                                     modify $ \(i, ib, str, _) -> (i, ib, str, [])
                     otherwise -> modify $ \(i, ib, str, _) -> (i, ib, str, a : buffer)
-
-runRW' :: ChannelIo Value -> (Value -> ChannelIo ()) -> IntCodeT ChannelIo ()
-runRW' rd wr = do whileM (gets $ not . halted) $! do stepRW rd wr
-                                                     liftIO yield
-                  return ()
 
 runCh :: IntState -> Int -> OutChan InMessage -> InChan OutMessage -> IO ()
 runCh ic id i o = let rd = readCh id o
                       wr = writeCh o
-                      state = runIntCodeT (runRW' rd wr) ic
+                      state = runIntCodeT (runRW rd wr) ic
                   in do [str] <- streamChan 1 i
                         result <- evalStateT state (False, Nothing, str, [])
                         return $ fst result
