@@ -76,6 +76,8 @@ main = do
     code <- map read . splitOn "," <$> getContents
 
     clearScreen
+    hideCursor
+
     setCursorPosition 1 45
 
     putStr "Task 1: "
@@ -91,3 +93,4 @@ main = do
     finalBoard <- runGame patched
 
     setCursorPosition 26 0
+    showCursor 
