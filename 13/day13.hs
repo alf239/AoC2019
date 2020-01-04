@@ -32,7 +32,6 @@ drawTile r c ch = do
     putStr [ch]
     hFlush stdout
 
-
 drawScore :: Value -> IO ()
 drawScore a = do
     setCursorPosition 3 53
@@ -43,7 +42,7 @@ readA :: Arkanoid Value
 readA = do
     p        <- gets paddle
     (bx, by) <- gets ball
-    let dir = if p > bx then 1 else (if p < bx then -1 else 0)
+    let dir = if p > bx then -1 else (if p < bx then 1 else 0)
     return $ if by > 23 then negate dir else dir
 
 writeA :: Value -> Arkanoid ()
@@ -61,7 +60,7 @@ writeA a = do
                 otherwise -> modify $ \s -> s { buffer = [] }
         otherwise -> modify $ \s -> s { buffer = fromIntegral a : buf }
 
-runGame :: [Value] -> IO Value
+runGame :: [Value] -> IO Board
 runGame m =
     let init      = fromMemory m
         intCode   = execStateT (runProgram readA writeA) init
@@ -70,7 +69,7 @@ runGame m =
                                                , paddle = -1
                                                , ball   = (-1, -1)
                                                }
-    in  score <$> ioProgram
+    in  ioProgram
 
 main :: IO ()
 main = do
@@ -89,6 +88,6 @@ main = do
     setCursorPosition 3 45
     putStr "Task 2: "
     let patched = 2 : tail code
-    finalScore <- runGame patched
+    finalBoard <- runGame patched
 
     setCursorPosition 26 0
