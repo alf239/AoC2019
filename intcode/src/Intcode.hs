@@ -127,16 +127,17 @@ fromMemory :: [Value] -> IntState
 fromMemory m =
   IntState { memory = Map.fromAscList . zip [0 ..] $ m, pc = 0, base = 0 }
 
+execIntcodeT :: Monad m => m Value -> (Value -> m ()) -> [Value] -> m IntState
+execIntcodeT r w m = execStateT (runProgram r w) (fromMemory m)
+
 runMem :: [Value] -> [Value]
 runMem m =
-  let init           = fromMemory m
-      intCode        = execStateT (runProgram readIoS writeIoS) init
+  let intCode        = execIntcodeT readIoS writeIoS m
       processedInput = evalStateT intCode []
   in  Map.elems . memory . fst . runWriter $ processedInput
 
 runInOut :: [Value] -> In -> Out
 runInOut m i =
-  let init           = fromMemory m
-      intCode        = execStateT (runProgram readIoS writeIoS) init
+  let intCode        = execIntcodeT readIoS writeIoS m
       processedInput = runStateT intCode i
   in  execWriter processedInput

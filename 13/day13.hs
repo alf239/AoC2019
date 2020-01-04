@@ -14,7 +14,8 @@ data Board = Board {
     buffer :: [Int],
     score  :: Value,
     paddle :: Int,
-    ball   :: (Int, Int)
+    ball   :: (Int, Int),
+    logic  :: Int -> (Int, Int) -> Value
 }
 
 type Arkanoid = StateT Board IO
@@ -38,12 +39,17 @@ drawScore a = do
     putStr (show a)
     hFlush stdout
 
+gameLogic :: Int -> (Int, Int) -> Value
+gameLogic p (bx, by) | p > bx    = -1
+                     | p < bx    = 1
+                     | otherwise = 0
+
 readA :: Arkanoid Value
 readA = do
-    p        <- gets paddle
-    (bx, by) <- gets ball
-    let dir = if p > bx then -1 else (if p < bx then 1 else 0)
-    return $ if by > 23 then negate dir else dir
+    p <- gets paddle
+    b <- gets ball
+    l <- gets logic
+    return $ l p b
 
 writeA :: Value -> Arkanoid ()
 writeA a = do
@@ -62,12 +68,12 @@ writeA a = do
 
 runGame :: [Value] -> IO Board
 runGame m =
-    let init      = fromMemory m
-        intCode   = execStateT (runProgram readA writeA) init
+    let intCode   = execIntcodeT readA writeA m
         ioProgram = execStateT intCode $ Board { buffer = []
                                                , score  = -1
                                                , paddle = -1
                                                , ball   = (-1, -1)
+                                               , logic  = gameLogic
                                                }
     in  ioProgram
 
@@ -93,4 +99,4 @@ main = do
     finalBoard <- runGame patched
 
     setCursorPosition 26 0
-    showCursor 
+    showCursor
