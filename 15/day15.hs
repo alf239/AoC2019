@@ -61,39 +61,36 @@ navigable m x = case Map.lookup x m of
     Just Oxy   -> True
     otherwise  -> False
 
+neighbours :: Coord -> (Dir -> a) -> Seq (Coord, a)
+neighbours x f =
+    Seq.fromList $ map (\d -> (move d x, f d)) [minBound .. maxBound]
+
 route :: Map Coord Loc -> Coord -> Coord -> [Dir]
 route m s g = route' (Seq.singleton (s, [])) Set.empty
   where
-    route' q seen =
-        let ((x, p) :< xs) = viewl q
-        in
-            if x == g
-                then reverse p
-                else if Set.member x seen || not (navigable m x)
-                    then route' xs seen
-                    else
-                        let
-                            options = map (\d -> (move d x, d : p))
-                                          [minBound .. maxBound]
-                        in  route' (xs >< Seq.fromList options)
-                                   (Set.insert x seen)
+    route' q seen = case viewl q of
+        EmptyL -> error ("no path found from " ++ show s ++ " to " ++ show g)
+        ((x, p) :< xs)
+            | x == g -> reverse p
+            | Set.member x seen || not (navigable m x) -> route' xs seen
+            | otherwise -> route' (xs >< neighbours x (\d -> d : p))
+                                  (Set.insert x seen)
 
 diameter :: Map Coord Loc -> Coord -> Int
 diameter m s = route' (Seq.singleton (s, 0)) Set.empty 0
   where
     route' q seen a = case viewl q of
-        EmptyL         -> a
-        ((x, p) :< xs) -> if Set.member x seen || not (navigable m x)
-            then route' xs seen a
-            else
-                let options =
-                        map (\d -> (move d x, p + 1)) [minBound .. maxBound]
-                in  route' (xs >< Seq.fromList options) (Set.insert x seen) p
+        EmptyL -> a
+        ((x, d) :< xs)
+            | Set.member x seen || not (navigable m x) -> route' xs seen a
+            | otherwise -> route' (xs >< neighbours x (const $ d + 1))
+                                  (Set.insert x seen)
+                                  d
 
 dequeueGoal :: Explorer (Maybe Coord)
 dequeueGoal = do
     seen <- gets explored
-    iterateWhile (alreadySeen seen) $ do
+    iterateWhile (already seen) $ do
         queue <- gets $ viewl . bfs
         case queue of
             x :< xs -> do
@@ -101,8 +98,8 @@ dequeueGoal = do
                 return $ Just x
             EmptyL -> return Nothing
   where
-    alreadySeen _    Nothing  = False
-    alreadySeen seen (Just x) = Map.member x seen
+    already _    Nothing  = False
+    already seen (Just x) = Map.member x seen
 
 planNextRoute :: Explorer ()
 planNextRoute = do
