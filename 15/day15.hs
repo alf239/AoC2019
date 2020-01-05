@@ -3,11 +3,12 @@ module Main where
 import           Control.Monad
 import           Control.Monad.Loops
 import           Control.Monad.State.Strict
-import           Data.Set                       ( Set )
-import qualified Data.Set                      as Set
+import           Data.Functor.Identity
+import           Data.List.Split
 import           Data.Map.Strict                ( Map )
 import qualified Data.Map.Strict               as Map
-import           Data.List.Split
+import           Data.Set                       ( Set )
+import qualified Data.Set                      as Set
 import           Data.Sequence                  ( Seq
                                                 , viewl
                                                 , ViewL(..)
@@ -15,11 +16,6 @@ import           Data.Sequence                  ( Seq
                                                 )
 import qualified Data.Sequence                 as Seq
 import           Intcode
-import           System.IO                      ( hFlush
-                                                , stdout
-                                                )
-import           System.Console.ANSI
-import           Debug.Trace
 
 data Dir    = North | South | West | East deriving (Show, Eq, Enum, Bounded)
 data Loc    = Space | Wall | Oxy  deriving (Show, Eq, Enum)
@@ -33,15 +29,10 @@ data ExplorerS = ExplorerS {
     oxygen   :: Maybe Coord
 } deriving (Show)
 
-type Explorer = StateT ExplorerS IO
+type Explorer = StateT ExplorerS Maybe
 
 command :: Dir -> Value
 command = (+ 1) . fromIntegral . fromEnum
-
-block :: Loc -> Char
-block Space = '.'
-block Wall  = '#'
-block Oxy   = 'o'
 
 move :: Dir -> Coord -> Coord
 move North (x, y) = (x, y - 1)
@@ -149,23 +140,23 @@ writeE x = do -- stepped just fine, perhaps found the oxygen valve
             planNextRoute
         else modify $ \s -> s { plan = ds }
 
-runDroid :: [Value] -> IO ExplorerS
+runDroid :: [Value] -> Maybe ExplorerS
 runDroid m =
     let intCode    = execIntcodeT readE writeE m
         initialMap = Map.singleton (0, 0) Space
-        ioProgram  = execStateT intCode $ ExplorerS
+        program    = execStateT intCode $ ExplorerS
             { explored = initialMap
             , droid    = (0, 0)
             , plan     = [North]
             , bfs      = Seq.fromList $ options initialMap (0, 0)
             , oxygen   = Nothing
             }
-    in  ioProgram
+    in  program
 
 main :: IO ()
 main = do
     code <- map read . splitOn "," <$> getContents
-    fs   <- runDroid code
+    let Just fs  = runDroid code
     let fullMap  = explored fs
     let Just oxy = oxygen fs
     let rt       = route fullMap (0, 0) oxy
@@ -174,4 +165,3 @@ main = do
 
     putStrLn "=== Task 2 ==="
     print $ diameter fullMap oxy
-
