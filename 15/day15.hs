@@ -29,7 +29,8 @@ data ExplorerS = ExplorerS {
     explored :: Map Coord Loc,
     droid    :: Coord,
     plan     :: [Dir],
-    bfs      :: Seq Coord
+    bfs      :: Seq Coord,
+    oxygen   :: Maybe Coord
 } deriving (Show)
 
 type Explorer = StateT ExplorerS IO
@@ -54,6 +55,12 @@ options m d =
         . map (\dir -> move dir d)
         $ [minBound .. maxBound]
 
+navigable :: Map Coord Loc -> Coord -> Bool
+navigable m x = case Map.lookup x m of
+    Just Space -> True
+    Just Oxy   -> True
+    otherwise  -> False
+
 route :: Map Coord Loc -> Coord -> Coord -> [Dir]
 route m s g = route' (Seq.singleton (s, [])) Set.empty
   where
@@ -62,7 +69,7 @@ route m s g = route' (Seq.singleton (s, [])) Set.empty
         in
             if x == g
                 then reverse p
-                else if (Set.member x seen || Map.lookup x m /= Just Space)
+                else if Set.member x seen || not (navigable m x)
                     then route' xs seen
                     else
                         let
@@ -71,22 +78,42 @@ route m s g = route' (Seq.singleton (s, [])) Set.empty
                         in  route' (xs >< Seq.fromList options)
                                    (Set.insert x seen)
 
-dequeueGoal :: Explorer Coord
+diameter :: Map Coord Loc -> Coord -> Int
+diameter m s = route' (Seq.singleton (s, 0)) Set.empty 0
+  where
+    route' q seen a = case viewl q of
+        EmptyL         -> a
+        ((x, p) :< xs) -> if Set.member x seen || not (navigable m x)
+            then route' xs seen a
+            else
+                let options =
+                        map (\d -> (move d x, p + 1)) [minBound .. maxBound]
+                in  route' (xs >< Seq.fromList options) (Set.insert x seen) p
+
+dequeueGoal :: Explorer (Maybe Coord)
 dequeueGoal = do
     seen <- gets explored
-    iterateWhile (\x -> Map.member x seen) $ do
-        x :< xs <- gets $ viewl . bfs
-        modify $ \s -> s { bfs = xs }
-        return x
+    iterateWhile (alreadySeen seen) $ do
+        queue <- gets $ viewl . bfs
+        case queue of
+            x :< xs -> do
+                modify $ \s -> s { bfs = xs }
+                return $ Just x
+            EmptyL -> return Nothing
+  where
+    alreadySeen _    Nothing  = False
+    alreadySeen seen (Just x) = Map.member x seen
 
 planNextRoute :: Explorer ()
 planNextRoute = do
-    next      <- dequeueGoal
-    explored' <- gets explored
-    droid'    <- gets droid
-    let path' = route explored' droid' next
-    modify $ \s -> s { plan = path' }
-
+    next <- dequeueGoal
+    case next of
+        Nothing    -> modify $ \s -> s { plan = [] } -- Request stop
+        Just next' -> do
+            explored' <- gets explored
+            droid'    <- gets droid
+            let path' = route explored' droid' next'
+            modify $ \s -> s { plan = path' }
 
 readE :: Explorer Value
 readE = do
@@ -106,14 +133,16 @@ writeE 0 = do -- hit the wall
                 s { explored = Map.insert (move d droid') Wall explored' }
             planNextRoute
         else error "We shouldn't hit walls en route"
-writeE 1 = do -- stepped just fine
+writeE x = do -- stepped just fine, perhaps found the oxygen valve
     (d : ds) <- gets plan
-    modify $ \s -> s { droid = move d (droid s) }
+    droid'   <- gets $ move d . droid
+    modify $ \s -> s { droid = droid' }
+    if x == 2 then modify $ \s -> s { oxygen = Just droid' } else return ()
     if null ds
         then do
             explored' <- gets explored
-            droid'    <- gets droid
-            let explored'' = Map.insert droid' Space explored'
+            let explored'' =
+                    Map.insert droid' (if x == 1 then Space else Oxy) explored'
             modify $ \s -> s { explored = explored'' }
             modify
                 $ \s -> s
@@ -122,11 +151,6 @@ writeE 1 = do -- stepped just fine
                       }
             planNextRoute
         else modify $ \s -> s { plan = ds }
-writeE 2 = do -- found the valve
-    d         <- gets $ head . plan
-    explored' <- gets explored
-    droid'    <- gets $ move d . droid
-    modify $ \s -> s { droid = droid', plan = [] }
 
 runDroid :: [Value] -> IO ExplorerS
 runDroid m =
@@ -137,13 +161,20 @@ runDroid m =
             , droid    = (0, 0)
             , plan     = [North]
             , bfs      = Seq.fromList $ options initialMap (0, 0)
+            , oxygen   = Nothing
             }
     in  ioProgram
 
 main :: IO ()
 main = do
-    code       <- map read . splitOn "," <$> getContents
-    fs <- runDroid code
-    let rt = route (explored fs) (0, 0) (droid fs)
+    code <- map read . splitOn "," <$> getContents
+    fs   <- runDroid code
+    let fullMap  = explored fs
+    let Just oxy = oxygen fs
+    let rt       = route fullMap (0, 0) oxy
+    putStrLn "=== Task 1 ==="
     print $ length rt
+
+    putStrLn "=== Task 2 ==="
+    print $ diameter fullMap oxy
 
