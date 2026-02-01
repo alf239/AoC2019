@@ -6,7 +6,7 @@ import Data.List (intercalate)
 import Data.List.Split
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Intcode
+import Intcode hiding (runProgram)
 import Data.Char
 import Data.Either
 import Debug.Trace

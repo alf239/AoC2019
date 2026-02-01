@@ -1,19 +1,44 @@
-packages: 02/
-          05/
-          07/
-          09/
-          10/
-          11/
-          12/
-          13/
-          14/
-          15/
-          16/
-          17/
-          19/
-          21/
-          22/
-          23/
-          24/
-          25/
-          intcode/
+-- AoC 2019 Multiproject Configuration
+-- ===================================
+-- Build all:    cabal build all
+-- Build one:    cabal build day5
+-- Run one:      cabal run day5
+-- Test all:     cabal test all
+-- REPL:         cabal repl day5
+
+packages:
+    01/
+    02/
+    03/
+    04/
+    05/
+    06/
+    07/
+    08/
+    09/
+    10/
+    11/
+    12/
+    13/
+    14/
+    15/
+    16/
+    17/
+    19/
+    21/
+    22/
+    23/
+    24/
+    25/
+    intcode/
+
+-- Excluded packages:
+-- 18/ - Python solution
+-- 20/ - Python solution
+
+-- Shared settings for all packages
+program-options
+  ghc-options: -Wall
+
+-- Optional: Enable parallel builds
+jobs: $ncpus
