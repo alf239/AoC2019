@@ -1,0 +1,18 @@
+cabal-version:       2.4
+
+name:                day8
+version:             0.1.0.0
+synopsis:            Day 8 - Space Image Format
+homepage:            https://github.com/alf239/AoC2019
+license:             MIT
+license-file:        LICENSE
+author:              Alexey Filippov
+maintainer:          afilippov@acm.org
+category:            Game
+extra-source-files:  CHANGELOG.md
+
+executable day8
+  main-is:             day8.hs
+  build-depends:       base >= 4.12,
+                       split
+  default-language:    Haskell2010
